@@ -46,28 +46,27 @@
 
 <button id="mute" aria-label="Musik an/aus">musik an</button>
 
-<!-- Lege deinen Song als song.mp3 neben diese Datei -->
 <audio id="song" src="song.mp3" loop preload="auto"></audio>
 
 <script>
-/* ===== HIER DEINE TEXTE EINTRAGEN =====
-   Jeder Eintrag erscheint nacheinander. \n = neue Zeile. */
+
 const PASSAGES = [
-  "Hey.\nDu bist noch wach.",
-  "Das ist okay.\nDu musst nichts tun.\nNicht denken, nicht lösen, nicht funktionieren.",
-  "Ich habe diesen Ort für dich gebaut,\nfür die Nächte, in denen alles zu laut ist,\nobwohl es eigentlich still ist.",
-  "Atme langsam ein.\nUnd noch langsamer aus.",
-  "Was auch immer dich gerade wachhält –\nes ist morgen auch noch da,\naber du musst es heute Nacht nicht tragen.",
+  "Hey.\nDu bist ja noch wach.",
+  "Das ist okay.\nDu musst nichts tun.\nNicht denken, nichts lösen, nicht funktionieren.",
+  "Ich habe diesen Ort für dich gemacht,\nfür die Nächte, in denen alles zu laut ist,\nobwohl es eigentlich still ist.",
+  "Wenn du lieber alleine sein möchtest.",
+  "Atme langsam ein.\nUnd langsamer aus.",
+  "Was auch immer dich gerade wachhält –\nes ist morgen auch noch da,\naber du musst es heute Nacht nicht tragen oder lösen.",
   "Ich bin da.\nAuch wenn ich gerade schlafe.\nAuch wenn wir weit weg sind.",
   "Du bist mir wichtig.\nMehr, als ich in einen Text packen kann.",
-  "Lass die Augen zufallen,\nwann immer sie wollen.",
-  "Gute Nacht.\nSchlaf gut. ♡"
+  "Lass die Augen zufallen,\nwann immer sie, oder Du, wollen.",
+  "Gute Nacht.\nSchlaf gut und träume ganz ganz süß! ♡"
 ];
-const TYPE_MS = 70;      // Tempo pro Buchstabe (höher = langsamer)
-const PAUSE_END = 4500;  // Wie lange ein Text stehen bleibt
-const GAP = 3000;        // Pause zwischen den Texten
+const TYPE_MS = 70;      
+const PAUSE_END = 4500;  
+const GAP = 3000;       
 
-/* ===== Sternenhimmel ===== */
+
 const cv = document.getElementById('sky'), cx = cv.getContext('2d');
 let stars = [];
 function resize() {
@@ -88,7 +87,7 @@ addEventListener('resize', resize); resize();
   requestAnimationFrame(draw);
 })(0);
 
-/* ===== Musik ===== */
+
 const audio = document.getElementById('song'), muteBtn = document.getElementById('mute');
 let muted = false;
 function fadeIn(target = .6, ms = 5000) {
@@ -107,7 +106,7 @@ muteBtn.onclick = () => {
   if (!muted && audio.paused) audio.play().catch(() => {});
 };
 
-/* ===== Typewriter ===== */
+
 const el = document.getElementById('text');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function show(txt) {
@@ -129,7 +128,7 @@ async function run() {
   while (true) for (const p of PASSAGES) await show(p);
 }
 
-/* ===== Start (Browser erlauben Musik erst nach einem Tipp) ===== */
+
 document.getElementById('intro').addEventListener('click', function begin() {
   this.removeEventListener('click', begin);
   audio.play().then(() => fadeIn()).catch(() => {});
