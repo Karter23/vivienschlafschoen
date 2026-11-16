@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04050a">
+<title>für dich</title>
+<style>
+  :root { --bg:#04050a; --text:#b9bfd6; --dim:#4a5068; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); overflow: hidden; }
+  body { font-family: Georgia, "Times New Roman", serif; color: var(--text); -webkit-tap-highlight-color: transparent; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           padding: 12vh 8vw; text-align: center; }
+  #text { max-width: 34rem; font-size: clamp(1.15rem, 4.2vw, 1.6rem); line-height: 1.9; letter-spacing: .02em;
+          white-space: pre-line; opacity: 0; transition: opacity 2.5s ease; text-shadow: 0 0 24px rgba(140,160,255,.25); }
+  #text.on { opacity: 1; }
+  #text::after { content: ""; display: inline-block; width: 1px; height: 1.1em; margin-left: 3px;
+                 background: var(--dim); vertical-align: -.15em; animation: blink 1.2s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #intro { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center;
+           justify-content: center; gap: 2.2rem; background: var(--bg); transition: opacity 2.5s ease; cursor: pointer; }
+  #intro.gone { opacity: 0; pointer-events: none; }
+  #intro p { margin: 0; font-size: 1.05rem; color: var(--dim); letter-spacing: .08em; }
+  #intro button { font: inherit; color: var(--text); background: none; border: 1px solid #1d2133; border-radius: 999px;
+                  padding: .8rem 2.2rem; letter-spacing: .12em; cursor: pointer; animation: pulse 4s ease-in-out infinite; }
+  @keyframes pulse { 50% { border-color: #3a4166; box-shadow: 0 0 28px rgba(110,130,255,.15); } }
+
+  #controls { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%);
+              bottom: max(1.2rem, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .9rem; }
+  #mute { font: inherit; font-size: .9rem; letter-spacing: .1em; color: var(--text); background: rgba(20,24,40,.6);
+          border: 1px solid #262c44; border-radius: 999px; padding: .6rem 1.2rem; cursor: pointer; white-space: nowrap;
+          transition: border-color .3s, color .3s; }
+  #mute:hover, #mute:focus-visible { border-color: #4a5380; outline: none; }
+  #mute[aria-pressed="false"] { color: var(--dim); }
+  #vol { -webkit-appearance: none; appearance: none; width: 7.5rem; height: 2rem; background: transparent; cursor: pointer; }
+  #vol::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: #262c44; }
+  #vol::-moz-range-track { height: 3px; border-radius: 3px; background: #262c44; }
+  #vol::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6.5px; border-radius: 50%;
+                               background: var(--text); border: 0; box-shadow: 0 0 10px rgba(140,160,255,.35); }
+  #vol::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--text); border: 0; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<div id="stage"><div id="text" aria-live="polite"></div></div>
+
+<div id="intro">
+  <p>für dich</p>
+  <button id="start">öffnen</button>
+</div>
+
+<div id="controls">
+  <button id="mute" type="button" aria-pressed="true">♪ musik an</button>
+  <input id="vol" type="range" min="0" max="100" value="60" aria-label="Lautstärke">
+</div>
+
+<!-- Lege deinen Song als song.mp3 neben diese Datei -->
+<audio id="song" src="song.mp3" loop preload="auto"></audio>
+
+<script>
+/* ===== HIER DEINE TEXTE EINTRAGEN =====
+   Jeder Eintrag erscheint nacheinander. \n = neue Zeile. */
+const PASSAGES = [
+  "Hey.\nDu bist noch wach.",
+  "Das ist okay.\nDu musst nichts tun.\nNicht denken, nicht lösen, nicht funktionieren.",
+  "Ich habe diesen Ort für dich gebaut,\nfür die Nächte, in denen alles zu laut ist,\nobwohl es eigentlich still ist.",
+  "Atme langsam ein.\nUnd noch langsamer aus.",
+  "Was auch immer dich gerade wachhält –\nes ist morgen auch noch da,\naber du musst es heute Nacht nicht tragen.",
+  "Ich bin da.\nAuch wenn ich gerade schlafe.\nAuch wenn wir weit weg sind.",
+  "Du bist mir wichtig.\nMehr, als ich in einen Text packen kann.",
+  "Lass die Augen zufallen,\nwann immer sie wollen.",
+  "Gute Nacht.\nSchlaf gut. ♡"
+];
+const TYPE_MS = 70;      // Tempo pro Buchstabe (höher = langsamer)
+const PAUSE_END = 4500;  // Wie lange ein Text stehen bleibt
+const GAP = 3000;        // Pause zwischen den Texten
+
+/* ===== Sternenhimmel ===== */
+const cv = document.getElementById('sky'), cx = cv.getContext('2d');
+let stars = [];
+function resize() {
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+  stars = Array.from({length: 90}, () => ({
+    x: Math.random() * cv.width, y: Math.random() * cv.height,
+    r: (Math.random() * 1.2 + .3) * devicePixelRatio, p: Math.random() * 6.28, s: Math.random() * .0006 + .0002
+  }));
+}
+addEventListener('resize', resize); resize();
+(function draw(t) {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  for (const s of stars) {
+    const a = .12 + .12 * Math.sin(t * s.s + s.p);
+    cx.fillStyle = `rgba(170,185,255,${a})`;
+    cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.28); cx.fill();
+  }
+  requestAnimationFrame(draw);
+})(0);
+
+/* ===== Musik ===== */
+const audio = document.getElementById('song'), muteBtn = document.getElementById('mute'), vol = document.getElementById('vol');
+let muted = false, ctx = null, gain = null;
+const level = () => vol.value / 100;
+
+// Web Audio-Gain, damit die Lautstärke auch auf dem iPhone regelbar ist
+function setupAudio() {
+  if (ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    ctx = new AC();
+    const src = ctx.createMediaElementSource(audio);
+    gain = ctx.createGain();
+    gain.gain.value = 0;
+    src.connect(gain).connect(ctx.destination);
+  } catch (e) { ctx = gain = null; }
+}
+function setVol(v) { if (gain) gain.gain.value = v; else audio.volume = v; }
+function applyVol() { setVol(muted ? 0 : level()); }
+
+function fadeIn(ms = 5000) {
+  const t0 = performance.now();
+  (function step(now) {
+    const k = Math.min((now - t0) / ms, 1);
+    if (!muted) setVol(level() * k);
+    if (k < 1) requestAnimationFrame(step); else applyVol();
+  })(t0);
+}
+function setMuted(m) {
+  muted = m;
+  muteBtn.textContent = muted ? '♪ musik aus' : '♪ musik an';
+  muteBtn.setAttribute('aria-pressed', String(!muted));
+  applyVol();
+  if (!muted && audio.paused) audio.play().catch(() => {});
+}
+muteBtn.onclick = () => setMuted(!muted);
+vol.addEventListener('input', () => {
+  if (muted && level() > 0) setMuted(false); else applyVol();
+});
+
+/* ===== Typewriter ===== */
+const el = document.getElementById('text');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function show(txt) {
+  el.textContent = '';
+  el.classList.add('on');
+  for (const ch of txt) {
+    el.textContent += ch;
+    let d = TYPE_MS + Math.random() * 40;
+    if ('.,–!?'.includes(ch)) d += 450;
+    if (ch === '\n') d += 700;
+    await sleep(d);
+  }
+  await sleep(PAUSE_END);
+  el.classList.remove('on');
+  await sleep(2500 + GAP);
+}
+async function run() {
+  await sleep(2500);
+  while (true) for (const p of PASSAGES) await show(p);
+}
+
+/* ===== Start (Browser erlauben Musik erst nach einem Tipp) ===== */
+document.getElementById('intro').addEventListener('click', function begin() {
+  this.removeEventListener('click', begin);
+  setupAudio();
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+  setVol(0);
+  audio.play().then(() => fadeIn()).catch(() => {});
+  document.getElementById('intro').classList.add('gone');
+  run();
+});
+</script>
+</body>
+</html>
