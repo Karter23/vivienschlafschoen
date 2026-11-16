@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04050a">
+<title>für dich</title>
+<style>
+  :root { --bg:#04050a; --text:#b9bfd6; --dim:#4a5068; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); overflow: hidden; }
+  body { font-family: Georgia, "Times New Roman", serif; color: var(--text); -webkit-tap-highlight-color: transparent; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           padding: 12vh 8vw; text-align: center; }
+  #text { max-width: 34rem; font-size: clamp(1.15rem, 4.2vw, 1.6rem); line-height: 1.9; letter-spacing: .02em;
+          white-space: pre-line; opacity: 0; transition: opacity 2.5s ease; text-shadow: 0 0 24px rgba(140,160,255,.25); }
+  #text.on { opacity: 1; }
+  #text::after { content: ""; display: inline-block; width: 1px; height: 1.1em; margin-left: 3px;
+                 background: var(--dim); vertical-align: -.15em; animation: blink 1.2s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #intro { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center;
+           justify-content: center; gap: 2.2rem; background: var(--bg); transition: opacity 2.5s ease; cursor: pointer; }
+  #intro.gone { opacity: 0; pointer-events: none; }
+  #intro p { margin: 0; font-size: 1.05rem; color: var(--dim); letter-spacing: .08em; }
+  #intro button { font: inherit; color: var(--text); background: none; border: 1px solid #1d2133; border-radius: 999px;
+                  padding: .8rem 2.2rem; letter-spacing: .12em; cursor: pointer; animation: pulse 4s ease-in-out infinite; }
+  @keyframes pulse { 50% { border-color: #3a4166; box-shadow: 0 0 28px rgba(110,130,255,.15); } }
+
+  #mute { position: fixed; z-index: 4; right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom));
+          background: none; border: 0; color: var(--dim); font: inherit; font-size: .85rem; letter-spacing: .1em;
+          padding: .6rem; opacity: .6; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<div id="stage"><div id="text" aria-live="polite"></div></div>
+
+<div id="intro">
+  <p>für dich</p>
+  <button id="start">öffnen</button>
+</div>
+
+<button id="mute" aria-label="Musik an/aus">musik an</button>
+
+<!-- Lege deinen Song als song.mp3 neben diese Datei -->
+<audio id="song" src="song.mp3" loop preload="auto"></audio>
+
+<script>
+/* ===== HIER DEINE TEXTE EINTRAGEN =====
+   Jeder Eintrag erscheint nacheinander. \n = neue Zeile. */
+const PASSAGES = [
+  "Hey.\nDu bist noch wach.",
+  "Das ist okay.\nDu musst nichts tun.\nNicht denken, nicht lösen, nicht funktionieren.",
+  "Ich habe diesen Ort für dich gebaut,\nfür die Nächte, in denen alles zu laut ist,\nobwohl es eigentlich still ist.",
+  "Atme langsam ein.\nUnd noch langsamer aus.",
+  "Was auch immer dich gerade wachhält –\nes ist morgen auch noch da,\naber du musst es heute Nacht nicht tragen.",
+  "Ich bin da.\nAuch wenn ich gerade schlafe.\nAuch wenn wir weit weg sind.",
+  "Du bist mir wichtig.\nMehr, als ich in einen Text packen kann.",
+  "Lass die Augen zufallen,\nwann immer sie wollen.",
+  "Gute Nacht.\nSchlaf gut. ♡"
+];
+const TYPE_MS = 70;      // Tempo pro Buchstabe (höher = langsamer)
+const PAUSE_END = 4500;  // Wie lange ein Text stehen bleibt
+const GAP = 3000;        // Pause zwischen den Texten
+
+/* ===== Sternenhimmel ===== */
+const cv = document.getElementById('sky'), cx = cv.getContext('2d');
+let stars = [];
+function resize() {
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+  stars = Array.from({length: 90}, () => ({
+    x: Math.random() * cv.width, y: Math.random() * cv.height,
+    r: (Math.random() * 1.2 + .3) * devicePixelRatio, p: Math.random() * 6.28, s: Math.random() * .0006 + .0002
+  }));
+}
+addEventListener('resize', resize); resize();
+(function draw(t) {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  for (const s of stars) {
+    const a = .12 + .12 * Math.sin(t * s.s + s.p);
+    cx.fillStyle = `rgba(170,185,255,${a})`;
+    cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.28); cx.fill();
+  }
+  requestAnimationFrame(draw);
+})(0);
+
+/* ===== Musik ===== */
+const audio = document.getElementById('song'), muteBtn = document.getElementById('mute');
+let muted = false;
+function fadeIn(target = .6, ms = 5000) {
+  audio.volume = 0;
+  const t0 = performance.now();
+  (function step(now) {
+    const k = Math.min((now - t0) / ms, 1);
+    if (!muted) audio.volume = target * k;
+    if (k < 1) requestAnimationFrame(step);
+  })(t0);
+}
+muteBtn.onclick = () => {
+  muted = !muted;
+  audio.muted = muted;
+  muteBtn.textContent = muted ? 'musik aus' : 'musik an';
+  if (!muted && audio.paused) audio.play().catch(() => {});
+};
+
+/* ===== Typewriter ===== */
+const el = document.getElementById('text');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function show(txt) {
+  el.textContent = '';
+  el.classList.add('on');
+  for (const ch of txt) {
+    el.textContent += ch;
+    let d = TYPE_MS + Math.random() * 40;
+    if ('.,–!?'.includes(ch)) d += 450;
+    if (ch === '\n') d += 700;
+    await sleep(d);
+  }
+  await sleep(PAUSE_END);
+  el.classList.remove('on');
+  await sleep(2500 + GAP);
+}
+async function run() {
+  await sleep(2500);
+  while (true) for (const p of PASSAGES) await show(p);
+}
+
+/* ===== Start (Browser erlauben Musik erst nach einem Tipp) ===== */
+document.getElementById('intro').addEventListener('click', function begin() {
+  this.removeEventListener('click', begin);
+  audio.play().then(() => fadeIn()).catch(() => {});
+  document.getElementById('intro').classList.add('gone');
+  run();
+});
+</script>
+</body>
+</html>
